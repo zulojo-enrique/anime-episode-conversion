@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - ANIDB_API_URL=${ANIDB_API_URL}
+      - ANIDB_CLIENT=${ANIDB_CLIENT}
+      - ANIDB_CLIENTVER=${ANIDB_CLIENTVER}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
