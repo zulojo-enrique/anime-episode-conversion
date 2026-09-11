@@ -9,5 +9,8 @@ services:
       - ANIDB_CLIENT=${ANIDB_CLIENT}
       - ANIDB_CLIENTVER=${ANIDB_CLIENTVER}
     volumes:
-      - ./data:/app/data
+      - data:/app/data
     restart: unless-stopped
+
+volumes:
+  data:
