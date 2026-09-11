@@ -1,6 +1,6 @@
 services:
   api:
-    build: .
+    image: ghcr.io/zulojo-enrique/anime-episode-conversion:latest
     ports:
       - "3001:3001"
     environment:

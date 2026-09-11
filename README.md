@@ -74,6 +74,7 @@ The `data/` folder is mounted as a volume, so the AniDB titles index persists ac
 | `ANIDB_API_URL` | Yes | AniDB HTTP API URL |
 | `ANIDB_CLIENT` | Yes | Client name for AniDB API |
 | `ANIDB_CLIENTVER` | Yes | Client version for AniDB API |
+| `ANIDB_TITLES_FILE` | No | Local path to `anime-titles.xml.gz`. If empty, downloads from anidb.net and saves to `data/`. The titles index cache is always stored in `data/titles-index.json` |
 | `PORT` | No | Server port (default: `3001`) |
 
 ### CI/CD
