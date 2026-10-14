@@ -16,7 +16,10 @@ const tmdbClient = new TmdbApiClient({ apiKey: tmdbApiKey });
 const anidbClient = new AnidbHttpClient({
   baseUrl: process.env.ANIDB_API_URL,
   client: process.env.ANIDB_CLIENT,
-  clientver: process.env.ANIDB_CLIENTVER
+  clientver: process.env.ANIDB_CLIENTVER,
+  minIntervalMs: process.env.ANIDB_REQUEST_INTERVAL_MS
+    ? parseInt(process.env.ANIDB_REQUEST_INTERVAL_MS, 10)
+    : undefined
 });
 
 const titlesIndex = new AnimeTitlesIndex({

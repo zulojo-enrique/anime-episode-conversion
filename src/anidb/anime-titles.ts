@@ -182,23 +182,27 @@ export class AnimeTitlesIndex {
   }
 
   findAidsForTitles(titles: string[]): number[] {
-    const aids = new Set<number>();
+    const exactAids = new Set<number>();
+    const prefixAids = new Set<number>();
+
     for (const title of titles) {
       const exact = this.findAids(title);
       const prefix = this.findAidsPrefix(title);
-      const found = [...new Set([...exact, ...prefix])];
 
       const parts: string[] = [];
       if (exact.length > 0) parts.push(`exact: ${exact.length}`);
       if (prefix.length > 0) parts.push(`prefix: ${prefix.length}`);
-      console.log(`[Titles] "${title}" -> ${parts.length > 0 ? parts.join(', ') : '0'} AIDs: ${found.join(', ') || 'none'}`);
+      console.log(`[Titles] "${title}" -> ${parts.length > 0 ? parts.join(', ') : '0'} AIDs`);
 
-      for (const aid of found) {
-        aids.add(aid);
-      }
+      for (const aid of exact) exactAids.add(aid);
+      for (const aid of prefix) prefixAids.add(aid);
     }
-    const result = Array.from(aids);
-    console.log(`[Titles] Total unique AIDs: ${result.length}`);
+
+    const useExact = exactAids.size > 0;
+    const result = Array.from(useExact ? exactAids : prefixAids);
+    console.log(
+      `[Titles] Using ${useExact ? 'exact' : 'prefix'} matches: ${result.length} AIDs: ${result.join(', ') || 'none'}`
+    );
     return result;
   }
 }

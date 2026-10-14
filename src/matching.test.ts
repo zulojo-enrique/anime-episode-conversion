@@ -6,18 +6,22 @@ describe('findMatches', () => {
   const createAnime = (
     aid: number,
     titles: string[],
-    startdate: string,
-    enddate: string,
+    startdate: string | null,
+    enddate: string | null,
     episodes: { epno: string; type: string; airdate: string | null }[]
   ): AnidbAnime => ({
     aid,
+    type: 'TV',
+    episodeCount: episodes.length,
     titles,
     startdate,
     enddate,
     episodes: episodes.map(ep => ({
       epno: ep.epno,
       type: ep.type as any,
-      airdate: ep.airdate
+      airdate: ep.airdate,
+      titleEN: null,
+      titleJA: null
     }))
   });
 
@@ -99,5 +103,37 @@ describe('findMatches', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].episode).toBe(1);
+  });
+
+  it('should match anime still airing (no enddate)', () => {
+    const anime = createAnime(69, ['One Piece'], '1999-10-20', null, [
+      { epno: '1', type: '1', airdate: '1999-10-20' }
+    ]);
+
+    const result = findMatches('1999-10-20', [anime]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].aid).toBe(69);
+    expect(result[0].episode).toBe(1);
+  });
+
+  it('should reject date before startdate when no enddate', () => {
+    const anime = createAnime(69, ['One Piece'], '1999-10-20', null, [
+      { epno: '1', type: '1', airdate: '1999-10-20' }
+    ]);
+
+    const result = findMatches('1999-10-19', [anime]);
+
+    expect(result).toHaveLength(0);
+  });
+
+  it('should reject anime without startdate', () => {
+    const anime = createAnime(69, ['One Piece'], null, null, [
+      { epno: '1', type: '1', airdate: '1999-10-20' }
+    ]);
+
+    const result = findMatches('1999-10-20', [anime]);
+
+    expect(result).toHaveLength(0);
   });
 });

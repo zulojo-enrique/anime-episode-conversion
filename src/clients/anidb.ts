@@ -11,7 +11,11 @@ export class AnidbHttpClient implements AnidbClient {
   private client: string;
   private clientver: string;
   private timeout: number;
+  private minIntervalMs: number;
   private cache: Map<number, CacheEntry> = new Map();
+  private requestQueue: Promise<unknown> = Promise.resolve();
+  private lastRequestAt = 0;
+  private static readonly DEFAULT_MIN_INTERVAL_MS = 2000;
   private static readonly AIRING_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
   private static readonly COMPLETED_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 1 month
   private static readonly COMPLETED_MARGIN_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
@@ -22,27 +26,68 @@ export class AnidbHttpClient implements AnidbClient {
     client?: string;
     clientver?: string;
     timeout?: number;
+    minIntervalMs?: number;
   }) {
     this.baseUrl = config.baseUrl || 'http://api.anidb.net:9001';
     this.client = config.client || 'animeconversion';
     this.clientver = config.clientver || '1';
     this.timeout = config.timeout || 10000;
+    this.minIntervalMs = config.minIntervalMs ?? AnidbHttpClient.DEFAULT_MIN_INTERVAL_MS;
     setInterval(() => this.cleanup(), AnidbHttpClient.CLEANUP_INTERVAL_MS);
   }
 
-  async getAnime(aid: number): Promise<AnidbAnime> {
+  private getCached(aid: number): AnidbAnime | null {
     const entry = this.cache.get(aid);
     if (entry && this.isCacheValid(entry)) {
-      console.log(`[AniDB] Cache hit for AID=${aid}`);
       return entry.data;
+    }
+    return null;
+  }
+
+  private enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.requestQueue.then(async () => {
+      const waitMs = this.minIntervalMs - (Date.now() - this.lastRequestAt);
+      if (waitMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+      }
+      try {
+        return await task();
+      } finally {
+        this.lastRequestAt = Date.now();
+      }
+    });
+
+    this.requestQueue = run.then(
+      () => undefined,
+      () => undefined
+    );
+
+    return run;
+  }
+
+  async getAnime(aid: number): Promise<AnidbAnime> {
+    const cached = this.getCached(aid);
+    if (cached) {
+      console.log(`[AniDB] Cache hit for AID=${aid}`);
+      return cached;
+    }
+
+    return this.enqueue(() => this.fetchAnime(aid));
+  }
+
+  private async fetchAnime(aid: number): Promise<AnidbAnime> {
+    const cached = this.getCached(aid);
+    if (cached) {
+      console.log(`[AniDB] Cache hit for AID=${aid}`);
+      return cached;
     }
 
     const url = `${this.baseUrl}/httpapi?request=anime&client=${this.client}&clientver=${this.clientver}&protover=1&aid=${aid}`;
     console.log(`[AniDB] Fetching anime: AID=${aid}`);
-    
+
     const response = await this.fetchWithTimeout(url);
     console.log(`[AniDB] Response status: ${response.status}`);
-    
+
     if (!response.ok) {
       throw new Error(`AniDB API error: ${response.status}`);
     }
@@ -54,6 +99,15 @@ export class AnidbHttpClient implements AnidbClient {
     });
 
     const parsed = parser.parse(text);
+
+    const apiError = parsed.error;
+    if (apiError) {
+      const code = apiError['@_code'];
+      const message = typeof apiError === 'string' ? apiError : apiError['#text'];
+      const detail = message ? `: ${message}` : '';
+      throw new Error(`AniDB API error${code ? ` ${code}` : ''}${detail}`);
+    }
+
     const anime = parsed.anime;
 
     if (!anime) {
@@ -139,18 +193,20 @@ export class AnidbHttpClient implements AnidbClient {
   }
 
   private isCacheValid(entry: CacheEntry): boolean {
+    const ageMs = Date.now() - entry.cachedAt;
     const enddate = entry.data.enddate;
-    if (!enddate) return false;
+
+    if (!enddate) {
+      return ageMs < AnidbHttpClient.AIRING_TTL_MS;
+    }
 
     const enddateMs = new Date(enddate).getTime();
     const marginMs = enddateMs + AnidbHttpClient.COMPLETED_MARGIN_MS;
 
     if (Date.now() < marginMs) {
-      const ageMs = Date.now() - entry.cachedAt;
       return ageMs < AnidbHttpClient.AIRING_TTL_MS;
     }
 
-    const ageMs = Date.now() - entry.cachedAt;
     return ageMs < AnidbHttpClient.COMPLETED_TTL_MS;
   }
 
@@ -158,20 +214,21 @@ export class AnidbHttpClient implements AnidbClient {
     const now = Date.now();
     let cleaned = 0;
     for (const [aid, entry] of this.cache) {
+      const ageMs = now - entry.cachedAt;
       const enddate = entry.data.enddate;
+
+      let ttl: number;
       if (!enddate) {
-        this.cache.delete(aid);
-        cleaned++;
-        continue;
+        ttl = AnidbHttpClient.AIRING_TTL_MS;
+      } else {
+        const enddateMs = new Date(enddate).getTime();
+        const marginMs = enddateMs + AnidbHttpClient.COMPLETED_MARGIN_MS;
+        ttl = now < marginMs
+          ? AnidbHttpClient.AIRING_TTL_MS
+          : AnidbHttpClient.COMPLETED_TTL_MS;
       }
 
-      const enddateMs = new Date(enddate).getTime();
-      const marginMs = enddateMs + AnidbHttpClient.COMPLETED_MARGIN_MS;
-      const ttl = now < marginMs
-        ? AnidbHttpClient.AIRING_TTL_MS
-        : AnidbHttpClient.COMPLETED_TTL_MS;
-
-      if (now - entry.cachedAt > ttl) {
+      if (ageMs > ttl) {
         this.cache.delete(aid);
         cleaned++;
       }

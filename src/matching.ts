@@ -43,8 +43,12 @@ function isDateInRange(
   startdate: string | null,
   enddate: string | null
 ): boolean {
-  if (!startdate || !enddate) {
+  if (!startdate) {
     return false;
+  }
+
+  if (!enddate) {
+    return date >= startdate;
   }
 
   return date >= startdate && date <= enddate;

@@ -8,8 +8,7 @@ dist/
 .env
 
 # Data files (downloaded from AniDB)
-data/*.gz
-data/*.json
+data/*
 
 # Logs
 *.log

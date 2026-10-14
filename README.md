@@ -10,7 +10,7 @@ This API solves the problem by using **air dates** as the bridge between both da
 
 1. **TMDB** provides the episode's air date (`air_date` field from `/tv/{id}/season/{season}/episode/{episode}`)
 2. The API fetches the show title from TMDB (including Romaji alternative title)
-3. Title lookup finds candidate anime in AniDB using the `anime-titles.xml` index (exact + prefix matching)
+3. Title lookup finds candidate anime in AniDB using the `anime-titles.xml` index (prefers exact title matches, falls back to prefix matching only when there are no exact matches)
 4. For each candidate, the API fetches full episode data from AniDB's HTTP API
 5. **Matching** compares the TMDB air date against all AniDB episode air dates for that anime
 6. All AniDB episodes that aired on the same date are returned as results
@@ -75,6 +75,7 @@ The `data/` folder is mounted as a volume, so the AniDB titles index persists ac
 | `ANIDB_CLIENT` | Yes | Client name for AniDB API |
 | `ANIDB_CLIENTVER` | Yes | Client version for AniDB API |
 | `ANIDB_TITLES_FILE` | No | Local path to `anime-titles.xml.gz`. If empty, downloads from anidb.net and saves to `data/`. The titles index cache is always stored in `data/titles-index.json` |
+| `ANIDB_REQUEST_INTERVAL_MS` | No | Minimum interval between AniDB HTTP API requests in milliseconds (default: `2000`). AniDB rate-limits clients, so requests are serialized with this spacing |
 | `PORT` | No | Server port (default: `3001`) |
 
 ### CI/CD
